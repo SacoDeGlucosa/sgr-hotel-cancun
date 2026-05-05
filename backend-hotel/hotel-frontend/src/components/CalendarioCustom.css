@@ -1,0 +1,43 @@
+/* Contenedor principal del calendario */
+.react-datepicker {
+  font-family: 'Arial', sans-serif;
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  display: flex !important;
+}
+
+/* Encabezado azul (Abril 2026 / Mayo 2026) */
+.react-datepicker__header {
+  background-color: #004678 !important; /* El azul oscuro de Barceló */
+  color: white !important;
+  border-bottom: none;
+  padding-top: 15px;
+}
+
+.react-datepicker__current-month {
+  color: white !important;
+  text-transform: capitalize;
+}
+
+.react-datepicker__day-name {
+  color: rgba(255,255,255,0.7) !important;
+}
+
+/* Estilo de los días seleccionados y el rango */
+.react-datepicker__day--selected, 
+.react-datepicker__day--in-range,
+.react-datepicker__day--in-selecting-range {
+  background-color: #f0f7ff !important;
+  color: #004678 !important;
+  border: 1px solid #004678;
+  border-radius: 0 !important;
+}
+
+/* El día de inicio y fin con borde más grueso */
+.react-datepicker__day--range-start,
+.react-datepicker__day--range-end {
+  background-color: white !important;
+  border: 2px solid #004678 !important;
+  font-weight: bold;
+}

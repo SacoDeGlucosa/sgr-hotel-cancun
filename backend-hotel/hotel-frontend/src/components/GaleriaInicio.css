@@ -1,0 +1,51 @@
+/* src/components/GaleriaInicio.css */
+
+/* Estilo para la tarjeta (contenedor de la imagen) */
+.galeria-card {
+  position: relative;
+  height: 400px; 
+  border-radius: 4px;
+  overflow: hidden; 
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  transition: box-shadow 0.3s ease; 
+}
+
+/* Efecto hover para la tarjeta (más sombra al pasar el mouse) */
+.galeria-card:hover {
+  box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+}
+
+/* Estilo para la imagen (dentro de la tarjeta) */
+.galeria-imagen {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.9); 
+  
+  /* TRANSICIÓN CLAVE: Controla la suavidad del zoom */
+  transition: transform 0.6s ease; 
+}
+
+/* EL EFECTO ZOOM: Cuando el cursor está sobre la TARJETA, la IMAGEN se agranda */
+.galeria-card:hover .galeria-imagen {
+  transform: scale(1.1); 
+}
+
+/* Estilo para el overlay (el degradado y el texto) */
+.galeria-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  padding: 30px;
+  text-align: center; /* <-- CORREGIDO */
+  z-index: 2; 
+}
+
+.galeria-texto {
+  color: white;
+  font-size: 1.3rem; /* <-- CORREGIDO */
+  font-weight: bold;
+}
