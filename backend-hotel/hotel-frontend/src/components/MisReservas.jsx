@@ -28,8 +28,30 @@ const MisReservas = () => {
         setLoading(false);
       });
   }, []);
-const handleCancelar = async (id_reserva) => {
-  if (!window.confirm('¿Estás seguro que deseas cancelar esta reserva?')) return;
+// Calcula los días previos al check-in para mostrar el porcentaje de penalización al usuario
+const calcularPenalizacionPrevista = (fecha_inicio) => {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const inicio = new Date(fecha_inicio);
+  inicio.setHours(0, 0, 0, 0);
+  const dias = Math.floor((inicio - hoy) / (1000 * 60 * 60 * 24));
+  if (dias >= 7) return { dias, porcentaje: 0 };
+  if (dias >= 3) return { dias, porcentaje: 30 };
+  if (dias >= 1) return { dias, porcentaje: 50 };
+  return { dias, porcentaje: 100 };
+};
+
+const handleCancelar = async (id_reserva, fecha_inicio) => {
+  const { dias, porcentaje } = calcularPenalizacionPrevista(fecha_inicio);
+
+  let mensaje = '¿Estás seguro que deseas cancelar esta reserva?';
+  if (porcentaje === 0) {
+    mensaje += `\n\n✅ Faltan ${dias} día(s) para el check-in. Tienes derecho a reembolso completo (sin penalización).`;
+  } else {
+    mensaje += `\n\n⚠️ Faltan ${dias} día(s) para el check-in.\nSe aplicará una penalización del ${porcentaje}% sobre el costo total.`;
+  }
+
+  if (!window.confirm(mensaje)) return;
 
   try {
     const response = await apiFetch(`/reservas/${id_reserva}/cancelar`, {
@@ -37,9 +59,12 @@ const handleCancelar = async (id_reserva) => {
     });
     const data = await response.json();
     if (response.ok) {
-      toast.success('Reserva cancelada exitosamente');
+      toast.success(
+        `Reserva cancelada. Reembolso: $${Number(data.montoReembolso).toLocaleString()} (penalización: $${Number(data.montoPenalizacion).toLocaleString()})`,
+        { autoClose: 6000 }
+      );
       // Recargar las reservas
-      setReservas(reservas.map(r => 
+      setReservas(reservas.map(r =>
         r.id_reserva === id_reserva ? {...r, estado: 'cancelada'} : r
       ));
     } else {
@@ -90,8 +115,8 @@ const handleCancelar = async (id_reserva) => {
               
                 {/* Botón cancelar solo si está confirmada */}
                 {r.estado === 'confirmada' && (
-                  <button 
-                    onClick={() => handleCancelar(r.id_reserva)}
+                  <button
+                    onClick={() => handleCancelar(r.id_reserva, r.fecha_inicio)}
                     style={btnCancelar}
                   >
                     ❌ Cancelar reserva

@@ -51,11 +51,16 @@ const PanelRecepcionista = () => {
   const handleCheckOut = async (id_reserva) => {
     try {
       const response = await apiFetch(`/reservas/${id_reserva}/checkout`, {
-        method: 'PUT'
+        method: 'PUT',
+        body: JSON.stringify({ cargos_adicionales: 0 })
       });
       const data = await response.json();
       if (response.ok) {
-        toast.success('✅ Check-out realizado exitosamente');
+        const f = data.factura;
+        toast.success(
+          `✅ Check-out completado. Total facturado: $${Number(f.total_pagado).toLocaleString()} (${f.noches} noche(s) × $${Number(f.precio_por_noche).toLocaleString()})`,
+          { autoClose: 6000 }
+        );
         cargarReservas();
       } else {
         toast.error(data.error);

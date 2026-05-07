@@ -59,6 +59,7 @@ CREATE TABLE reservas (
     costo_total      DECIMAL(10, 2) NULL,
     total_pagado     DECIMAL(10, 2) NULL,         -- se llena en el check-out (RF-08)
     penalizacion     DECIMAL(10, 2) NULL,         -- aplicada en cancelación (RF-06)
+    monto_reembolso  DECIMAL(10, 2) NULL,         -- reembolso al huésped tras cancelación (RF-06)
     fecha_creacion   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_checkin    TIMESTAMP NULL,              -- registrada en RF-07
     fecha_checkout   TIMESTAMP NULL,              -- registrada en RF-08

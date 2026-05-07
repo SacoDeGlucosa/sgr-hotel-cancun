@@ -153,57 +153,155 @@ const checkIn = (req, res) => {
 };
 
 // ==========================================
-// FUNCIÓN 6: HACER CHECK-OUT (RECEPCIONISTA)
+// ==========================================
+// FUNCIÓN 6: HACER CHECK-OUT (RF-08)
+// Calcula la facturación final: precio × noches + cargos adicionales (opcional).
+// El recepcionista puede pasar { cargos_adicionales: 50000 } en el body si aplica.
 // ==========================================
 const checkOut = (req, res) => {
   const { id_reserva } = req.params;
+  const cargosAdicionales = parseFloat(req.body?.cargos_adicionales) || 0;
 
-  const sql = `
-    UPDATE reservas SET estado = 'finalizada'
-    WHERE id_reserva = ? AND estado = 'ocupada'
+  // Paso 1: traer datos de la reserva y la habitación para calcular el total
+  const sqlGet = `
+    SELECT r.id_reserva, r.id_habitacion, r.estado,
+           DATEDIFF(r.fecha_fin, r.fecha_inicio) AS noches,
+           h.precio
+    FROM reservas r
+    JOIN habitaciones h ON h.id_habitacion = r.id_habitacion
+    WHERE r.id_reserva = ?
   `;
 
-  db.query(sql, [id_reserva], (err, result) => {
+  db.query(sqlGet, [id_reserva], (err, results) => {
     if (err) return res.status(500).json({ error: 'Error en la base de datos' });
-    if (result.affectedRows === 0) return res.status(400).json({ error: 'La reserva no existe o no está ocupada' });
+    if (results.length === 0) return res.status(404).json({ error: 'Reserva no encontrada' });
 
-    // Actualizar estado de la habitación a libre
-    const sqlHabitacion = `
-      UPDATE habitaciones h
-      JOIN reservas r ON h.id_habitacion = r.id_habitacion
-      SET h.estado = 'libre'
-      WHERE r.id_reserva = ?
+    const reserva = results[0];
+
+    if (reserva.estado !== 'ocupada') {
+      return res.status(400).json({
+        error: `No se puede hacer check-out de una reserva en estado: ${reserva.estado}`
+      });
+    }
+
+    // Paso 2: calcular factura
+    const subtotal = parseFloat(reserva.precio) * reserva.noches;
+    const totalPagado = subtotal + cargosAdicionales;
+
+    // Paso 3: actualizar reserva con estado, total y fecha de checkout
+    const sqlUpdate = `
+      UPDATE reservas
+      SET estado = 'finalizada',
+          total_pagado = ?,
+          fecha_checkout = NOW()
+      WHERE id_reserva = ?
     `;
-    db.query(sqlHabitacion, [id_reserva]);
 
-    res.json({ mensaje: 'Check-out realizado exitosamente' });
+    db.query(sqlUpdate, [totalPagado, id_reserva], (err2) => {
+      if (err2) return res.status(500).json({ error: 'Error en la base de datos' });
+
+      // Paso 4: liberar la habitación
+      db.query(
+        'UPDATE habitaciones SET estado = "libre" WHERE id_habitacion = ?',
+        [reserva.id_habitacion]
+      );
+
+      // Paso 5: devolver la "factura" al recepcionista
+      res.json({
+        mensaje: 'Check-out realizado exitosamente',
+        factura: {
+          id_reserva: reserva.id_reserva,
+          noches: reserva.noches,
+          precio_por_noche: parseFloat(reserva.precio).toFixed(2),
+          subtotal: subtotal.toFixed(2),
+          cargos_adicionales: cargosAdicionales.toFixed(2),
+          total_pagado: totalPagado.toFixed(2)
+        }
+      });
+    });
   });
 };
 // ==========================================
-// FUNCIÓN 7: CANCELAR RESERVA (HUÉSPED)
+// FUNCIÓN 7: CANCELAR RESERVA (RF-06)
+// Aplica política de penalización según días previos al check-in:
+//   ≥7 días     →   0% penalización (reembolso 100%)
+//   3-6 días    →  30% penalización (reembolso 70%)
+//   1-2 días    →  50% penalización (reembolso 50%)
+//   0 días o ya pasó → 100% penalización (reembolso 0%)
 // ==========================================
 const cancelarReserva = (req, res) => {
   const { id_reserva } = req.params;
 
-  const sql = `
-    UPDATE reservas SET estado = 'cancelada'
-    WHERE id_reserva = ? AND estado = 'confirmada'
+  // Paso 1: traer la reserva para conocer fecha_inicio, costo y estado
+  const sqlGet = `
+    SELECT r.id_reserva, r.id_habitacion, r.fecha_inicio, r.estado, h.precio,
+           DATEDIFF(r.fecha_fin, r.fecha_inicio) AS noches
+    FROM reservas r
+    JOIN habitaciones h ON h.id_habitacion = r.id_habitacion
+    WHERE r.id_reserva = ?
   `;
 
-  db.query(sql, [id_reserva], (err, result) => {
+  db.query(sqlGet, [id_reserva], (err, results) => {
     if (err) return res.status(500).json({ error: 'Error en la base de datos' });
-    if (result.affectedRows === 0) return res.status(400).json({ error: 'La reserva no existe o no puede cancelarse' });
+    if (results.length === 0) return res.status(404).json({ error: 'Reserva no encontrada' });
 
-    // Liberar la habitación
-    const sqlHabitacion = `
-      UPDATE habitaciones h
-      JOIN reservas r ON h.id_habitacion = r.id_habitacion
-      SET h.estado = 'libre'
-      WHERE r.id_reserva = ?
+    const reserva = results[0];
+
+    // Validación de estado
+    if (reserva.estado !== 'confirmada') {
+      return res.status(400).json({
+        error: `No se puede cancelar una reserva en estado: ${reserva.estado}`
+      });
+    }
+
+    // Paso 2: calcular días restantes hasta el check-in
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0); // normalizar a medianoche
+    const fechaInicio = new Date(reserva.fecha_inicio);
+    fechaInicio.setHours(0, 0, 0, 0);
+    const msPorDia = 1000 * 60 * 60 * 24;
+    const diasRestantes = Math.floor((fechaInicio - hoy) / msPorDia);
+
+    // Paso 3: determinar porcentaje de penalización
+    let porcentajePenalizacion;
+    if (diasRestantes >= 7)        porcentajePenalizacion = 0;
+    else if (diasRestantes >= 3)   porcentajePenalizacion = 30;
+    else if (diasRestantes >= 1)   porcentajePenalizacion = 50;
+    else                           porcentajePenalizacion = 100;
+
+    // Paso 4: calcular montos
+    const costoTotal = parseFloat(reserva.precio) * reserva.noches;
+    const montoPenalizacion = costoTotal * (porcentajePenalizacion / 100);
+    const montoReembolso = costoTotal - montoPenalizacion;
+
+    // Paso 5: actualizar la reserva con los montos y la fecha de cancelación
+    const sqlUpdate = `
+      UPDATE reservas
+      SET estado = 'cancelada',
+          penalizacion = ?,
+          monto_reembolso = ?,
+          fecha_cancelacion = NOW()
+      WHERE id_reserva = ?
     `;
-    db.query(sqlHabitacion, [id_reserva]);
 
-    res.json({ mensaje: 'Reserva cancelada exitosamente' });
+    db.query(sqlUpdate, [montoPenalizacion, montoReembolso, id_reserva], (err2) => {
+      if (err2) return res.status(500).json({ error: 'Error al cancelar la reserva' });
+
+      // Paso 6: liberar la habitación
+      db.query(
+        'UPDATE habitaciones SET estado = "libre" WHERE id_habitacion = ?',
+        [reserva.id_habitacion]
+      );
+
+      res.json({
+        mensaje: 'Reserva cancelada exitosamente',
+        diasPrevios: diasRestantes,
+        porcentajePenalizacion,
+        costoTotal: costoTotal.toFixed(2),
+        montoPenalizacion: montoPenalizacion.toFixed(2),
+        montoReembolso: montoReembolso.toFixed(2)
+      });
+    });
   });
 };
 
