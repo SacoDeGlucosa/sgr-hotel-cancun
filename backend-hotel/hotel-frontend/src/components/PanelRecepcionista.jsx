@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LayoutPage from './LayoutPage';
 import { toast } from 'react-toastify';
+import { apiFetch, getUsuarioActual } from '../utils/api';
 
 const PanelRecepcionista = () => {
   const [reservas, setReservas] = useState([]);
@@ -9,7 +10,7 @@ const PanelRecepcionista = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const usuario = JSON.parse(localStorage.getItem('usuario'));
+    const usuario = getUsuarioActual();
     if (!usuario || usuario.rol !== 'recepcionista') {
       navigate('/');
       return;
@@ -18,19 +19,22 @@ const PanelRecepcionista = () => {
   }, []);
 
   const cargarReservas = () => {
-    fetch('http://localhost:3000/api/reservas/todas')
+    apiFetch('/reservas/todas')
       .then(res => res.json())
       .then(data => {
-        setReservas(data);
+        setReservas(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error cargando reservas:', err);
         setLoading(false);
       });
   };
 
   const handleCheckIn = async (id_reserva) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/reservas/${id_reserva}/checkin`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' }
+      const response = await apiFetch(`/reservas/${id_reserva}/checkin`, {
+        method: 'PUT'
       });
       const data = await response.json();
       if (response.ok) {
@@ -46,9 +50,8 @@ const PanelRecepcionista = () => {
 
   const handleCheckOut = async (id_reserva) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/reservas/${id_reserva}/checkout`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' }
+      const response = await apiFetch(`/reservas/${id_reserva}/checkout`, {
+        method: 'PUT'
       });
       const data = await response.json();
       if (response.ok) {

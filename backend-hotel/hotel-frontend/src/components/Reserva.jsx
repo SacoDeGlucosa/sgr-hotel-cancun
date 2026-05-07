@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import LayoutPage from './LayoutPage';
 import { toast } from 'react-toastify';
+import { apiFetch, getUsuarioActual } from '../utils/api';
 
 const Reserva = () => {
   const location = useLocation();
@@ -16,13 +17,16 @@ const Reserva = () => {
   const [fechasOcupadas, setFechasOcupadas] = useState([]);
 
   useEffect(() => {
-  // Traer las reservas de esta habitación para bloquear fechas
-    fetch('http://localhost:3000/api/reservas/todas')
-      .then(res => res.json())
+  // Traer las reservas de esta habitación para bloquear fechas (mejor esfuerzo).
+  // Si el usuario no tiene permisos para ver todas las reservas (ej: huésped),
+  // simplemente no bloqueamos fechas en la UI; el backend igual valida al crear.
+    apiFetch('/reservas/todas')
+      .then(res => res.ok ? res.json() : [])
       .then(reservas => {
+        if (!Array.isArray(reservas)) return;
         const ocupadas = reservas
-          .filter(r => 
-            r.id_habitacion === habitacion.id_habitacion && 
+          .filter(r =>
+            r.id_habitacion === habitacion.id_habitacion &&
             (r.estado === 'confirmada' || r.estado === 'ocupada')
           )
           .map(r => ({
@@ -66,7 +70,7 @@ const fechaEstaOcupada = (fecha) => {
     }
 
     // Verificar que el usuario esté logueado
-    const usuario = JSON.parse(localStorage.getItem('usuario'));
+    const usuario = getUsuarioActual();
     if (!usuario) {
       toast.error('Debes iniciar sesión para reservar');
       navigate('/login');
@@ -75,9 +79,8 @@ const fechaEstaOcupada = (fecha) => {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3000/api/reservas', {
+      const response = await apiFetch('/reservas', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id_usuario: usuario.id,
           id_habitacion: habitacion.id_habitacion,

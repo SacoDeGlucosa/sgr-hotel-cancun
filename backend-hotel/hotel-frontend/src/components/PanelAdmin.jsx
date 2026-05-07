@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LayoutPage from './LayoutPage';
+import { apiFetch, getUsuarioActual } from '../utils/api';
 
 const PanelAdmin = () => {
   const [estadisticas, setEstadisticas] = useState(null);
@@ -10,25 +11,27 @@ const PanelAdmin = () => {
 
   useEffect(() => {
     // Verificar que el usuario sea administrador
-    const usuario = JSON.parse(localStorage.getItem('usuario'));
+    const usuario = getUsuarioActual();
     if (!usuario || usuario.rol !== 'administrador') {
       navigate('/');
       return;
     }
 
-    // Cargar estadísticas
-    fetch('http://localhost:3000/api/reservas/estadisticas')
-      .then(res => res.json())
-      .then(data => setEstadisticas(data));
-
-    // Cargar todas las reservas
-    fetch('http://localhost:3000/api/reservas/todas')
-      .then(res => res.json())
-      .then(data => {
-        setReservas(data);
+    // Cargar estadísticas y reservas en paralelo
+    Promise.all([
+      apiFetch('/reservas/estadisticas').then(res => res.json()),
+      apiFetch('/reservas/todas').then(res => res.json())
+    ])
+      .then(([statsData, reservasData]) => {
+        setEstadisticas(statsData);
+        setReservas(Array.isArray(reservasData) ? reservasData : []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error cargando datos del panel:', err);
         setLoading(false);
       });
-  }, []);
+  }, [navigate]);
 
   return (
     <LayoutPage>
@@ -36,7 +39,7 @@ const PanelAdmin = () => {
         <h2 style={titleStyle}>Panel de Administrador</h2>
 
         {/* Tarjetas de estadísticas */}
-        {estadisticas && (
+        {estadisticas && estadisticas.habitaciones && (
           <div style={statsGrid}>
             <div style={{...statCard, borderLeft: '4px solid #2ecc71'}}>
               <h3 style={statNumber}>{estadisticas.habitaciones.total_habitaciones}</h3>

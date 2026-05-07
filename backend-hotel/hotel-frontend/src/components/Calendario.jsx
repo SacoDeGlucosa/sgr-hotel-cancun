@@ -5,38 +5,39 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import LayoutPage from './LayoutPage';
+import { apiFetch, getUsuarioActual } from '../utils/api';
 
 const Calendario = () => {
   const [eventos, setEventos] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const usuario = JSON.parse(localStorage.getItem('usuario'));
+    const usuario = getUsuarioActual();
     if (!usuario) {
       toast.error('Debes iniciar sesión para ver el calendario');
       navigate('/login');
       return;
     }
-  // ... resto del fetch
-}, []);
-  useEffect(() => {
-    const usuario = JSON.parse(localStorage.getItem('usuario'));
 
     // Si es admin o recepcionista ve todas, si es huésped solo las suyas
-    const url = usuario.rol === 'huesped' 
-      ? `http://localhost:3000/api/reservas/usuario/${usuario.id}`
-      : 'http://localhost:3000/api/reservas/todas';
+    const endpoint = usuario.rol === 'huesped'
+      ? `/reservas/usuario/${usuario.id}`
+      : '/reservas/todas';
 
-    fetch(url)
-      .then(res => res.json())
+    apiFetch(endpoint)
+      .then(res => res.ok ? res.json() : [])
       .then(reservas => {
+        if (!Array.isArray(reservas)) return;
         const eventosReservas = reservas.map(r => ({
-          title: `Hab #${r.id_habitacion} - ${r.nombre}`,
+          title: `Hab #${r.id_habitacion} - ${r.nombre || ''}`,
           start: r.fecha_inicio.split('T')[0],
           end: r.fecha_fin.split('T')[0],
           color: getColorEstado(r.estado)
         }));
         setEventos(eventosReservas);
+      })
+      .catch(err => {
+        console.error('Error cargando calendario:', err);
       });
   }, []);
 

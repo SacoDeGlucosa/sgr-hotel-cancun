@@ -1,26 +1,41 @@
 const express = require('express');
 const router = express.Router();
-const { crearReserva, getReservasUsuario, getTodasReservas, getEstadisticas, checkIn, checkOut, cancelarReserva } = require('../controllers/reservasController');
+const {
+  crearReserva,
+  getReservasUsuario,
+  getTodasReservas,
+  getEstadisticas,
+  checkIn,
+  checkOut,
+  cancelarReserva,
+  modificarReserva
+} = require('../controllers/reservasController');
 
-// POST /api/reservas — Crear una nueva reserva
-router.post('/', crearReserva);
+const { verifyToken } = require('../middleware/auth');
+const { authorizeRoles } = require('../middleware/roles');
 
-// GET /api/reservas/usuario/:id_usuario — Ver reservas de un usuario
-router.get('/usuario/:id_usuario', getReservasUsuario);
+// RF-04: Crear reserva (cualquier usuario autenticado)
+router.post('/', verifyToken, crearReserva);
 
-// GET /api/reservas/todas — Ver todas las reservas (admin)
-router.get('/todas', getTodasReservas);
+// RF-03: Ver reservas del propio usuario
+router.get('/usuario/:id_usuario', verifyToken, getReservasUsuario);
 
-// GET /api/reservas/estadisticas — Ver estadísticas (admin)
-router.get('/estadisticas', getEstadisticas);
+// RF-05: Modificar reserva (huésped modifica la suya)
+router.put('/:id_reserva/modificar', verifyToken, modificarReserva);
 
-// PUT /api/reservas/:id_reserva/checkin — Hacer check-in
-router.put('/:id_reserva/checkin', checkIn);
+// RF-06: Cancelar reserva (huésped cancela la suya)
+router.put('/:id_reserva/cancelar', verifyToken, cancelarReserva);
 
-// PUT /api/reservas/:id_reserva/checkout — Hacer check-out
-router.put('/:id_reserva/checkout', checkOut);
+// RF-07: Check-in — solo recepcionista o administrador
+router.put('/:id_reserva/checkin', verifyToken, authorizeRoles('recepcionista', 'administrador'), checkIn);
 
-// PUT /api/reservas/:id_reserva/cancelar — Cancelar una reserva
-router.put('/:id_reserva/cancelar', cancelarReserva);
+// RF-08: Check-out — solo recepcionista o administrador
+router.put('/:id_reserva/checkout', verifyToken, authorizeRoles('recepcionista', 'administrador'), checkOut);
+
+// RF-10: Todas las reservas — administrador y recepcionista (este último las necesita para check-in/out)
+router.get('/todas', verifyToken, authorizeRoles('administrador', 'recepcionista'), getTodasReservas);
+
+// RF-10: Estadísticas / reportes — solo administrador
+router.get('/estadisticas', verifyToken, authorizeRoles('administrador'), getEstadisticas);
 
 module.exports = router;

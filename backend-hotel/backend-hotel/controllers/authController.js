@@ -1,5 +1,6 @@
-const db = require('../config/bd'); // O la ruta donde lo hayas dejado
+const db = require('../config/bd');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 // ==========================================
 // FUNCIÓN 1: REGISTRAR USUARIO
@@ -46,13 +47,22 @@ const login = async (req, res) => {
       const match = await bcrypt.compare(password, usuario.contraseña);
       if (!match) return res.status(401).json({ error: "Contraseña incorrecta" });
 
-      // Todo es correcto, enviamos los datos al frontend
+      // Todo correcto → generar JWT con payload { id, nombre, rol }
+      const payload = {
+        id: usuario.id_usuario,
+        nombre: usuario.nombre,
+        rol: usuario.rol
+      };
+
+      const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '8h' });
+
       res.status(200).json({
         mensaje: "Login exitoso",
+        token,
         usuario: {
           id: usuario.id_usuario,
           nombre: usuario.nombre,
-          rol: usuario.rol, 
+          rol: usuario.rol,
           verificado: usuario.verificado
         }
       });

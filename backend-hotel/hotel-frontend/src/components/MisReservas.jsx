@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import LayoutPage from './LayoutPage';
+import { apiFetch, getUsuarioActual } from '../utils/api';
 
 const MisReservas = () => {
   const [reservas, setReservas] = useState([]);
@@ -9,17 +10,17 @@ const MisReservas = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const usuario = JSON.parse(localStorage.getItem('usuario'));
-    
+    const usuario = getUsuarioActual();
+
     if (!usuario) {
       navigate('/login');
       return;
     }
 
-    fetch(`http://localhost:3000/api/reservas/usuario/${usuario.id}`)
+    apiFetch(`/reservas/usuario/${usuario.id}`)
       .then(res => res.json())
       .then(data => {
-        setReservas(data);
+        setReservas(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(err => {
@@ -31,9 +32,8 @@ const handleCancelar = async (id_reserva) => {
   if (!window.confirm('¿Estás seguro que deseas cancelar esta reserva?')) return;
 
   try {
-    const response = await fetch(`http://localhost:3000/api/reservas/${id_reserva}/cancelar`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' }
+    const response = await apiFetch(`/reservas/${id_reserva}/cancelar`, {
+      method: 'PUT'
     });
     const data = await response.json();
     if (response.ok) {

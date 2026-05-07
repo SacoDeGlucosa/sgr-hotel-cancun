@@ -19,6 +19,7 @@ const handleLogin = async (e) => {
       const data = await response.json();
       
       if (response.ok) {
+        localStorage.setItem('token', data.token);
         localStorage.setItem('usuario', JSON.stringify(data.usuario));
         toast.success(`¡Bienvenido de vuelta!`);
   

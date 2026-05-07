@@ -5,6 +5,7 @@ const Navbar = ({ user }) => { // Quitamos showBanner de los props
 
   const handleLogout = () => {
     localStorage.removeItem("usuario");
+    localStorage.removeItem("token");
     // Usamos esto para limpiar el estado y redirigir
     window.location.href = "/";
   };

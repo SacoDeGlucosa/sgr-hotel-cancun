@@ -207,4 +207,64 @@ const cancelarReserva = (req, res) => {
   });
 };
 
-module.exports = { crearReserva, getReservasUsuario, getTodasReservas, getEstadisticas, checkIn, checkOut, cancelarReserva };
+// ==========================================
+// FUNCIÓN 8: MODIFICAR RESERVA (RF-05)
+// Solo antes del check-in y si la habitación está disponible en el nuevo rango
+// ==========================================
+const modificarReserva = (req, res) => {
+  const { id_reserva } = req.params;
+  const { fecha_inicio, fecha_fin } = req.body;
+
+  if (!fecha_inicio || !fecha_fin) {
+    return res.status(400).json({ error: 'Las nuevas fechas son obligatorias' });
+  }
+
+  if (new Date(fecha_fin) <= new Date(fecha_inicio)) {
+    return res.status(400).json({ error: 'La fecha de salida debe ser posterior a la fecha de ingreso' });
+  }
+
+  // Paso 1: Verificar que la reserva exista y no esté finalizada/cancelada
+  const sqlVerificar = `
+    SELECT * FROM reservas WHERE id_reserva = ?
+  `;
+
+  db.query(sqlVerificar, [id_reserva], (err, results) => {
+    if (err) return res.status(500).json({ error: 'Error en la base de datos' });
+    if (results.length === 0) return res.status(404).json({ error: 'Reserva no encontrada' });
+
+    const reserva = results[0];
+
+    if (['finalizada', 'cancelada', 'ocupada'].includes(reserva.estado)) {
+      return res.status(400).json({ error: 'No se puede modificar una reserva en estado: ' + reserva.estado });
+    }
+
+    // Paso 2: Verificar disponibilidad en el nuevo rango (excluyendo la reserva actual)
+    const sqlDisponibilidad = `
+      SELECT * FROM reservas
+      WHERE id_habitacion = ?
+      AND id_reserva != ?
+      AND estado = 'confirmada'
+      AND (fecha_inicio <= ? AND fecha_fin >= ?)
+    `;
+
+    db.query(sqlDisponibilidad, [reserva.id_habitacion, id_reserva, fecha_fin, fecha_inicio], (err2, conflicts) => {
+      if (err2) return res.status(500).json({ error: 'Error al verificar disponibilidad' });
+
+      if (conflicts.length > 0) {
+        return res.status(400).json({ error: 'La habitación no está disponible en las nuevas fechas seleccionadas' });
+      }
+
+      // Paso 3: Actualizar las fechas
+      db.query(
+        'UPDATE reservas SET fecha_inicio = ?, fecha_fin = ? WHERE id_reserva = ?',
+        [fecha_inicio, fecha_fin, id_reserva],
+        (err3, result) => {
+          if (err3) return res.status(500).json({ error: 'Error al modificar la reserva' });
+          res.json({ mensaje: 'Reserva modificada exitosamente' });
+        }
+      );
+    });
+  });
+};
+
+module.exports = { crearReserva, getReservasUsuario, getTodasReservas, getEstadisticas, checkIn, checkOut, cancelarReserva, modificarReserva };
